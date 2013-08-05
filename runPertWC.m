@@ -1,4 +1,4 @@
-function [] = runPertWC(islocal, genesTusRxns, parameterTypes, parameterVals)
+function parameters = runPertWC(islocal, replicates, genesTusRxns, parameterTypes, parameterVals, userData)
 %
 % See section 2.4.2 of competition page for how perturbations were generated
 % based on gold (mutant) data. Unlike there, this script applies all pertubation
@@ -15,7 +15,8 @@ function [] = runPertWC(islocal, genesTusRxns, parameterTypes, parameterVals)
 %
 % TODO:
 %
-% make output directory name related to simulation parameters
+% Test that parfor works
+%
 %
 % if using gurobi, try to specify solver algorithm to use
 % 
@@ -33,29 +34,28 @@ wholecell_root = '/home/brandon/DREAM8/WholeCell';
 output_root = '/home/brandon/DREAM8/WholeCell/output';
 rundir = pwd();
 
-try % try running whole cell simulation
+%try % try running whole cell simulation
 
 cd(wholecell_root)
 % Select
 %(1) simulation batch output directory and
 %(2) simulation output directory
 simBatch = datestr (now , 'yyyy_mm_dd_HH_MM_SS');
-simIdx = 1;
 simBatchDir = [ output_root filesep simBatch ]
-simDir = [ output_root filesep simBatch filesep ...
-    num2str(simIdx)];
-% create simulation batch and simulation output directories
+% create simulation batch directories
 if ~isdir(simBatchDir)
     mkdir(simBatchDir); % create simulation batch output directory
-end
-if ~isdir (simDir)
-    mkdir (simDir); % create simulation output directory
 end
 
 [sim, kbWID] = edu.stanford.covert.cell.sim.util.CachedSimulationObjectUtil.load();
 
+
 opts = sim.getOptions();
-opts.processes.Metabolism.linearProgrammingOptions.solver = 'gurobi';
+%check that gurobi is a mex function
+%gurobi currently seems broken in the whole cell model, but not in the COBRA/metabolic model
+%if exist('gurobi') == 3 
+%  opts.processes.Metabolism.linearProgrammingOptions.solver = 'gurobi';
+%end
 sim.applyOptions(opts);
 sim.applyOptions('lengthSec', 65000)
 
@@ -79,6 +79,15 @@ for i = 1:size(genesTusRxns, 1)
 end
 
 parameters = sim.getAllParameters();
+
+%perform simulations
+parfor i = 1:replicates
+
+simDir = [ output_root filesep simBatch filesep ...
+    num2str(i)];
+if ~isdir (simDir)
+    mkdir (simDir); % create simulation output directory
+end
 if size(genesTusRxns,1) > 0
   paramFileName = fullfile(simDir, sprintf('parameters_%s__%s__%s.mat', ...
     cellstrjoin(genesTusRxns,'_'), cellstrjoin(parameterTypes,'_'), ... 
@@ -86,7 +95,8 @@ if size(genesTusRxns,1) > 0
 else
   paramFileName = fullfile(simDir, 'parameters_WT.mat');
 end
-save(paramFileName, '-struct', 'parameters');
+
+parSaveFcn(paramFileName, 'parameters');
 
 % setup loggers
 summaryLogger = SummaryLogger (1, 1); % print to command line
@@ -96,23 +106,29 @@ diskLogger = DiskLogger (simDir , 10); % save complete dynamics to disk
 diskLogger.addMetadata(...
     'shortDescription', 'WT whole cell simulation', ...
     'longDescription', ['logging of WT whole cell simulation: ' paramFileName], ...
-    'email', 'beb82@cornell.edu', ...
-    'firstName', 'Brandon', ...
-    'lastName', 'Barker', ...
-    'affiliation', 'Cornell', ...
+    'email', userData.email, ...
+    'firstName', userData.firstName, ...
+    'lastName', userData.lastName, ...
+    'affiliation', userData.affiliation, ...
     'knowledgeBaseWID', kbWID, ...
     'revision', 1, ...
     'differencesFromRevision', [], ...
-    'userName', 'beb82', ...
-    'hostName', 'gulab.cornell.edu', ...
-    'ipAddress', '128.0.0.1');
+    'userName', userData.userName, ...
+    'hostName', userData.hostName, ...
+    'ipAddress', userData.ip);
 
 loggers = {summaryLogger; diskLogger};
 sim.run(loggers);
+end % end parfor
 
 simBatchDir
 
-catch err %
-end       % end of global try 
+%catch err %
+%end       % end of global try 
 
-cd(rundir)
+cd(rundir);
+end % end of runPertWC
+
+function parSaveFcn(fname, parameters)
+  save( fname, 'parameters' );
+end

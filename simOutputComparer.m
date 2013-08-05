@@ -1,4 +1,13 @@
 function [log1 states1]=simOutputComparer(file1,file2)
+%
+%  Authors:
+%  Yiping Wang (August 2013)
+%
+%  extract flux information from the logger output, 
+%  which we can use to compare differences between the full and surrogate submodels,
+%  or between different simulations for the same model type. 
+%
+%
 log1=load(file1);%'output/runSimulation/2013_08_04_17_25_01/1/summary.mat');
 log2=load(file2);
 
