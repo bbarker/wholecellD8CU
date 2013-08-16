@@ -1,4 +1,4 @@
-function parameters = runPertWC(islocal, replicates, genesTusRxns, parameterTypes, parameterVals, userData)
+function parameters = runPertWC(islocal, seeds, genesTusRxns, parameterTypes, parameterVals, userData)
 %
 % See section 2.4.2 of competition page for how perturbations were generated
 % based on gold (mutant) data. Unlike there, this script applies all pertubation
@@ -57,7 +57,7 @@ opts = sim.getOptions();
 %  opts.processes.Metabolism.linearProgrammingOptions.solver = 'gurobi';
 %end
 sim.applyOptions(opts);
-sim.applyOptions('lengthSec', 65000)
+sim.applyOptions('lengthSec', 65000);
 
 rnaPolTuBindingProbs = sim.getRnaPolTuBindingProbs();
 rnaHalfLives = sim.getRnaHalfLives();
@@ -81,10 +81,13 @@ end
 parameters = sim.getAllParameters();
 
 %perform simulations
+replicates = length(seeds);
 parfor i = 1:replicates
 
+rep = seeds(i);
+sim.applyOptions('seed', rep)
 simDir = [ output_root filesep simBatch filesep ...
-    num2str(i)];
+    num2str(rep)];
 if ~isdir (simDir)
     mkdir (simDir); % create simulation output directory
 end
